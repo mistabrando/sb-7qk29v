@@ -291,7 +291,7 @@
       escapeHtml(item.category) +
       '</span></span>';
     button.addEventListener('click', function () {
-      play(item);
+      play(item, true);
     });
     return button;
   }
@@ -307,12 +307,12 @@
     return '<span class="thumb-fallback">' + escapeHtml(initials || 'TV') + '</span>';
   }
 
-  function play(item) {
+  function play(item, openExternal) {
     state.current = item;
     els.nowTitle.textContent = item.name;
     els.nowMeta.textContent = item.category;
     els.openBtn.href = item.url;
-    els.openBtn.textContent = 'Open Stream';
+    els.openBtn.textContent = 'Open in New Tab';
     els.openBtn.classList.remove('disabled');
     els.copyBtn.disabled = false;
     els.favoriteBtn.disabled = false;
@@ -321,7 +321,11 @@
     if (isMixedStream(item.url)) {
       els.video.removeAttribute('src');
       els.video.load();
-      setStatus('Mobile Safari blocks inline HTTP video on this HTTPS page. Tap Open Stream to play the selected channel.', 'bad');
+      if (openExternal) {
+        openStreamWindow(item.url);
+      } else {
+        setStatus('Mobile Safari blocks inline HTTP video here. Tap Open in New Tab to play the selected channel.', 'bad');
+      }
       return;
     }
 
@@ -339,6 +343,15 @@
 
   function isMixedStream(url) {
     return window.location.protocol === 'https:' && /^http:\/\//i.test(String(url || ''));
+  }
+
+  function openStreamWindow(url) {
+    var popup = window.open(url, '_blank', 'noopener,noreferrer');
+    if (popup) {
+      setStatus('Opening stream in a new Safari tab...', 'good');
+    } else {
+      setStatus('Safari blocked the new tab. Tap Open in New Tab.', 'bad');
+    }
   }
 
   function updateFavoriteButton() {
