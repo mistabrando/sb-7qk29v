@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var catalog = { live: [], vod: [], liveCategories: [], vodCategories: [] };
+  var catalog = { live: [], vod: [], series: [], liveCategories: [], vodCategories: [], seriesCategories: [] };
   var state = {
     view: 'live',
     category: 'all',
@@ -36,6 +36,7 @@
 
   var liveByCategory = {};
   var vodByCategory = {};
+  var seriesByCategory = {};
   var searchTimer = null;
   var maxRenderedCards = 420;
 
@@ -133,10 +134,12 @@
         catalog = unlocked;
         liveByCategory = countByCategory(catalog.live);
         vodByCategory = countByCategory(catalog.vod);
+        seriesByCategory = countByCategory(catalog.series);
         els.summary.textContent =
           formatNumber(catalog.live.length) +
           ' live streams loaded locally' +
-          (catalog.vod.length ? ', ' + formatNumber(catalog.vod.length) + ' VOD items.' : '.');
+          (catalog.vod.length ? ', ' + formatNumber(catalog.vod.length) + ' movies' : '') +
+          (catalog.series.length ? ', ' + formatNumber(catalog.series.length) + ' series.' : '.');
         els.lockScreen.classList.add('hidden');
         els.catalogPassword.value = '';
         els.unlockError.textContent = '';
@@ -213,7 +216,7 @@
 
   function renderCategories() {
     var categories = activeCategories();
-    var counts = state.view === 'vod' ? vodByCategory : liveByCategory;
+    var counts = state.view === 'vod' ? vodByCategory : state.view === 'series' ? seriesByCategory : liveByCategory;
     els.categories.innerHTML = '';
 
     var allButton = categoryButton({ id: 'all', name: 'All' }, activeItems().length);
@@ -288,12 +291,47 @@
       '<span><span class="card-title">' +
       escapeHtml(item.name) +
       '</span><span class="card-meta">' +
-      escapeHtml(item.category) +
+      escapeHtml(metaForItem(item)) +
       '</span></span>';
     button.addEventListener('click', function () {
+      if (item.type === 'series') {
+        renderEpisodes(item);
+        return;
+      }
       play(item, true);
     });
     return button;
+  }
+
+  function metaForItem(item) {
+    if (item.type === 'episode') {
+      var label = 'S' + pad2(item.season) + ' E' + pad2(item.episode);
+      return item.duration ? label + ' · ' + item.duration : label;
+    }
+    if (item.type === 'series') {
+      var count = (item.episodes || []).length;
+      return item.category + (count ? ' · ' + count + ' episodes indexed' : ' · episodes pending');
+    }
+    return item.category;
+  }
+
+  function renderEpisodes(series) {
+    state.current = null;
+    els.resultsTitle.textContent = series.name;
+    els.resultsCount.textContent = formatNumber((series.episodes || []).length) + ' episodes';
+    els.results.innerHTML = '';
+    els.nowTitle.textContent = series.name;
+    els.nowMeta.textContent = series.plot || series.category;
+    els.openBtn.classList.add('disabled');
+    els.copyBtn.disabled = true;
+    els.favoriteBtn.disabled = true;
+    if (!series.episodes || !series.episodes.length) {
+      els.results.innerHTML = '<p class="empty">Episode details have not been indexed for this show yet.</p>';
+      setStatus('This show is in the top-series index, but its episode list is not packed yet.', 'bad');
+      return;
+    }
+    appendCards(series.episodes);
+    setStatus('Choose an episode. Mobile Safari will open it in a new tab.', 'good');
   }
 
   function thumbFallback(item) {
@@ -382,11 +420,13 @@
   function activeItems() {
     if (state.view === 'favorites') return Object.keys(state.favorites).map(function (key) { return state.favorites[key]; });
     if (state.view === 'vod') return catalog.vod || [];
+    if (state.view === 'series') return catalog.series || [];
     return catalog.live || [];
   }
 
   function activeCategories() {
     if (state.view === 'vod') return catalog.vodCategories || [];
+    if (state.view === 'series') return catalog.seriesCategories || [];
     if (state.view === 'favorites') {
       var seen = {};
       return activeItems()
@@ -415,6 +455,7 @@
   function titleForView() {
     if (state.view === 'favorites') return 'Favorites';
     if (state.view === 'vod') return 'VOD';
+    if (state.view === 'series') return 'Series';
     return 'Live';
   }
 
@@ -429,6 +470,10 @@
 
   function formatNumber(value) {
     return Number(value || 0).toLocaleString();
+  }
+
+  function pad2(value) {
+    return String(value || 0).padStart(2, '0');
   }
 
   function favoriteKey(item) {
