@@ -103,11 +103,15 @@
     });
     els.video.addEventListener('error', function () {
       var code = els.video.error ? els.video.error.code : 'unknown';
+      if (state.current && isMixedStream(state.current.url)) {
+        setStatus('Mobile Safari blocks this HTTP stream inside the HTTPS page. Tap Open Stream to play it directly.', 'bad');
+        return;
+      }
       setStatus('Playback error. Safari reported media error code ' + code + '.', 'bad');
     });
 
     els.installHint.addEventListener('click', function () {
-      setStatus('This page uses direct Safari HLS. It can be saved to your home screen after you move the files somewhere reachable by your phone.', 'good');
+      setStatus('GitHub Pages is HTTPS. HTTP streams may need Open Stream on iPhone Safari.', 'good');
     });
   }
 
@@ -305,15 +309,24 @@
 
   function play(item) {
     state.current = item;
-    els.video.src = item.url;
-    els.video.load();
     els.nowTitle.textContent = item.name;
     els.nowMeta.textContent = item.category;
     els.openBtn.href = item.url;
+    els.openBtn.textContent = 'Open Stream';
     els.openBtn.classList.remove('disabled');
     els.copyBtn.disabled = false;
     els.favoriteBtn.disabled = false;
     updateFavoriteButton();
+
+    if (isMixedStream(item.url)) {
+      els.video.removeAttribute('src');
+      els.video.load();
+      setStatus('Mobile Safari blocks inline HTTP video on this HTTPS page. Tap Open Stream to play the selected channel.', 'bad');
+      return;
+    }
+
+    els.video.src = item.url;
+    els.video.load();
     setStatus('Loading direct HLS stream...', '');
 
     var promise = els.video.play();
@@ -322,6 +335,10 @@
         setStatus('Safari may require a tap on the video play button.', '');
       });
     }
+  }
+
+  function isMixedStream(url) {
+    return window.location.protocol === 'https:' && /^http:\/\//i.test(String(url || ''));
   }
 
   function updateFavoriteButton() {
