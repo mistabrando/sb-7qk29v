@@ -306,7 +306,7 @@
   function metaForItem(item) {
     if (item.type === 'episode') {
       var label = 'S' + pad2(item.season) + ' E' + pad2(item.episode);
-      var player = item.player === 'vlc' ? 'VLC' : 'Safari';
+      var player = item.player === 'vlc' ? 'Infuse' : 'Safari';
       return (item.duration ? label + ' · ' + item.duration : label) + ' · ' + player;
     }
     if (item.type === 'series') {
@@ -350,8 +350,8 @@
     state.current = item;
     els.nowTitle.textContent = item.name;
     els.nowMeta.textContent = item.category;
-    els.openBtn.href = item.player === 'vlc' ? vlcStreamUrl(item.url) : item.url;
-    els.openBtn.textContent = item.player === 'vlc' ? 'Open in VLC' : 'Open in New Tab';
+    els.openBtn.href = item.player === 'vlc' ? infuseStreamUrl(item.url) : item.url;
+    els.openBtn.textContent = item.player === 'vlc' ? 'Open in Infuse' : 'Open in New Tab';
     els.openBtn.classList.remove('disabled');
     els.copyBtn.disabled = false;
     els.favoriteBtn.disabled = false;
@@ -361,9 +361,9 @@
       els.video.removeAttribute('src');
       els.video.load();
       if (openExternal) {
-        openVlcWindow(item.url);
+        openInfuseWindow(item.url);
       } else {
-        setStatus('This episode needs VLC on iPhone. Tap Open in VLC.', 'bad');
+        setStatus('This episode needs Infuse on iPhone. Tap Open in Infuse.', 'bad');
       }
       return;
     }
@@ -404,16 +404,16 @@
     }
   }
 
-  function vlcStreamUrl(url) {
-    return 'vlc-x-callback://x-callback-url/stream?url=' + encodeURIComponent(url);
+  function infuseStreamUrl(url) {
+    return 'infuse://x-callback-url/play?url=' + encodeURIComponent(url);
   }
 
-  function openVlcWindow(url) {
-    var popup = window.open(vlcStreamUrl(url), '_blank', 'noopener,noreferrer');
+  function openInfuseWindow(url) {
+    var popup = window.open(infuseStreamUrl(url), '_blank', 'noopener,noreferrer');
     if (popup) {
-      setStatus('Opening episode in VLC...', 'good');
+      setStatus('Opening episode in Infuse...', 'good');
     } else {
-      setStatus('Safari blocked VLC. Tap Open in VLC.', 'bad');
+      setStatus('Safari blocked Infuse. Tap Open in Infuse.', 'bad');
     }
   }
 
