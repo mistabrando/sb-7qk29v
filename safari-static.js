@@ -316,7 +316,7 @@
         return;
       }
       if (item.type === 'vod' || item.type === 'episode') {
-        openInfuseWindow(item.url);
+        openInfuseWindow(item.url, item.name);
         return;
       }
       play(item, true);
@@ -369,7 +369,7 @@
   function play(item, openExternal) {
     state.current = item;
     if (item.type !== 'live') {
-      openInfuseWindow(item.url);
+      openInfuseWindow(item.url, item.name);
       return;
     }
     showPlayer();
@@ -418,17 +418,18 @@
     }
   }
 
-  function infuseStreamUrl(url) {
-    return 'infuse://x-callback-url/play?url=' + encodeURIComponent(url);
+  function infuseStreamUrl(url, filename) {
+    return (
+      'infuse://x-callback-url/play?url=' +
+      encodeURIComponent(url) +
+      '&filename=' +
+      encodeURIComponent((filename || 'video').replace(/[/?#&=]+/g, ' ').trim())
+    );
   }
 
-  function openInfuseWindow(url) {
-    var popup = window.open(infuseStreamUrl(url), '_blank', 'noopener,noreferrer');
-    if (popup) {
-      setStatus('Opening episode in Infuse...', 'good');
-    } else {
-      setStatus('Safari blocked Infuse. Tap Open in Infuse.', 'bad');
-    }
+  function openInfuseWindow(url, filename) {
+    setStatus('Opening in Infuse...', 'good');
+    window.location.href = infuseStreamUrl(url, filename);
   }
 
   function showPlayer() {
