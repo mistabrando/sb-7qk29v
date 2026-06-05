@@ -8,6 +8,7 @@
     query: '',
     rows: [],
     current: null,
+    activeSeries: null,
     favorites: loadFavorites(),
     renderToken: 0,
   };
@@ -18,6 +19,7 @@
     catalogPassword: document.getElementById('catalogPassword'),
     unlockError: document.getElementById('unlockError'),
     summary: document.getElementById('summary'),
+    playerSection: document.getElementById('playerSection'),
     video: document.getElementById('video'),
     nowTitle: document.getElementById('nowTitle'),
     nowMeta: document.getElementById('nowMeta'),
@@ -28,6 +30,7 @@
     results: document.getElementById('results'),
     resultsTitle: document.getElementById('resultsTitle'),
     resultsCount: document.getElementById('resultsCount'),
+    backBtn: document.getElementById('backBtn'),
     favoriteBtn: document.getElementById('favoriteBtn'),
     copyBtn: document.getElementById('copyBtn'),
     openBtn: document.getElementById('openBtn'),
@@ -61,6 +64,8 @@
         });
         state.view = button.dataset.view;
         state.category = 'all';
+        state.activeSeries = null;
+        if (state.view !== 'live') hidePlayer();
         renderAll();
       });
     });
@@ -76,6 +81,11 @@
     els.clearSearch.addEventListener('click', function () {
       els.search.value = '';
       state.query = '';
+      renderResults();
+    });
+
+    els.backBtn.addEventListener('click', function () {
+      state.activeSeries = null;
       renderResults();
     });
 
@@ -105,7 +115,7 @@
     els.video.addEventListener('error', function () {
       var code = els.video.error ? els.video.error.code : 'unknown';
       if (state.current && isMixedStream(state.current.url)) {
-        setStatus('Mobile Safari blocks this HTTP stream inside the HTTPS page. Tap Open Stream to play it directly.', 'bad');
+      setStatus('Mobile Safari may block this HTTP live stream inside the HTTPS page. Tap Open in New Tab.', 'bad');
         return;
       }
       setStatus('Playback error. Safari reported media error code ' + code + '.', 'bad');
@@ -215,6 +225,7 @@
   }
 
   function renderCategories() {
+    if (state.activeSeries) return;
     var categories = activeCategories();
     var counts = state.view === 'vod' ? vodByCategory : state.view === 'series' ? seriesByCategory : liveByCategory;
     els.categories.innerHTML = '';
@@ -244,14 +255,20 @@
 
   function renderResults() {
     var token = ++state.renderToken;
+    if (state.activeSeries) {
+      renderEpisodes(state.activeSeries);
+      return;
+    }
     var rows = filteredItems();
     state.rows = rows;
 
     els.resultsTitle.textContent = titleForView();
+    els.backBtn.classList.add('hidden');
+    els.results.className = 'results results-' + state.view;
     var renderRows = rows.slice(0, maxRenderedCards);
     els.resultsCount.textContent =
       formatNumber(rows.length) +
-      (rows.length === 1 ? ' stream' : ' streams') +
+      countLabel(rows.length) +
       (rows.length > renderRows.length ? ' · showing ' + formatNumber(renderRows.length) : '');
     els.results.innerHTML = '';
 
@@ -284,7 +301,7 @@
   function card(item) {
     var button = document.createElement('button');
     button.type = 'button';
-    button.className = 'card';
+    button.className = 'card card-' + item.type;
     var icon = item.icon ? '<img class="thumb" loading="lazy" src="' + escapeHtml(item.icon) + '" alt="">' : thumbFallback(item);
     button.innerHTML =
       icon +
@@ -298,6 +315,10 @@
         renderEpisodes(item);
         return;
       }
+      if (item.type === 'vod' || item.type === 'episode') {
+        openInfuseWindow(item.url);
+        return;
+      }
       play(item, true);
     });
     return button;
@@ -306,33 +327,32 @@
   function metaForItem(item) {
     if (item.type === 'episode') {
       var label = 'S' + pad2(item.season) + ' E' + pad2(item.episode);
-      var player = item.player === 'vlc' ? 'Infuse' : 'Safari';
-      return (item.duration ? label + ' · ' + item.duration : label) + ' · ' + player;
+      return (item.duration ? label + ' · ' + item.duration : label) + ' · Infuse';
     }
     if (item.type === 'series') {
       var count = (item.episodes || []).length;
       return item.category + (count ? ' · ' + count + ' episodes indexed' : ' · episodes pending');
     }
+    if (item.type === 'vod') return [item.year || '', item.rating ? 'Rating ' + item.rating : '', 'Infuse'].filter(Boolean).join(' · ');
     return item.category;
   }
 
   function renderEpisodes(series) {
+    state.activeSeries = series;
     state.current = null;
+    hidePlayer();
     els.resultsTitle.textContent = series.name;
     els.resultsCount.textContent = formatNumber((series.episodes || []).length) + ' episodes';
     els.results.innerHTML = '';
-    els.nowTitle.textContent = series.name;
-    els.nowMeta.textContent = series.plot || series.category;
-    els.openBtn.classList.add('disabled');
-    els.copyBtn.disabled = true;
-    els.favoriteBtn.disabled = true;
+    els.results.className = 'results episode-list';
+    els.backBtn.classList.remove('hidden');
     if (!series.episodes || !series.episodes.length) {
       els.results.innerHTML = '<p class="empty">Episode details have not been indexed for this show yet.</p>';
       setStatus('This show is in the top-series index, but its episode list is not packed yet.', 'bad');
       return;
     }
     appendCards(series.episodes);
-    setStatus('Choose an episode. Mobile Safari will open it in a new tab.', 'good');
+    setStatus('Choose an episode to open in Infuse.', 'good');
   }
 
   function thumbFallback(item) {
@@ -348,25 +368,19 @@
 
   function play(item, openExternal) {
     state.current = item;
+    if (item.type !== 'live') {
+      openInfuseWindow(item.url);
+      return;
+    }
+    showPlayer();
     els.nowTitle.textContent = item.name;
     els.nowMeta.textContent = item.category;
-    els.openBtn.href = item.player === 'vlc' ? infuseStreamUrl(item.url) : item.url;
-    els.openBtn.textContent = item.player === 'vlc' ? 'Open in Infuse' : 'Open in New Tab';
+    els.openBtn.href = item.url;
+    els.openBtn.textContent = 'Open in New Tab';
     els.openBtn.classList.remove('disabled');
     els.copyBtn.disabled = false;
     els.favoriteBtn.disabled = false;
     updateFavoriteButton();
-
-    if (item.player === 'vlc') {
-      els.video.removeAttribute('src');
-      els.video.load();
-      if (openExternal) {
-        openInfuseWindow(item.url);
-      } else {
-        setStatus('This episode needs Infuse on iPhone. Tap Open in Infuse.', 'bad');
-      }
-      return;
-    }
 
     if (isMixedStream(item.url)) {
       els.video.removeAttribute('src');
@@ -374,7 +388,7 @@
       if (openExternal) {
         openStreamWindow(item.url);
       } else {
-        setStatus('Mobile Safari blocks inline HTTP video here. Tap Open in New Tab to play the selected channel.', 'bad');
+        setStatus('Mobile Safari may block inline HTTP live video here. Tap Open in New Tab.', 'bad');
       }
       return;
     }
@@ -415,6 +429,17 @@
     } else {
       setStatus('Safari blocked Infuse. Tap Open in Infuse.', 'bad');
     }
+  }
+
+  function showPlayer() {
+    els.playerSection.classList.remove('hidden');
+  }
+
+  function hidePlayer() {
+    els.playerSection.classList.add('hidden');
+    els.video.removeAttribute('src');
+    els.video.load();
+    state.current = null;
   }
 
   function updateFavoriteButton() {
@@ -482,6 +507,12 @@
     if (state.view === 'vod') return 'VOD';
     if (state.view === 'series') return 'Series';
     return 'Live';
+  }
+
+  function countLabel(count) {
+    if (state.view === 'vod') return count === 1 ? ' movie' : ' movies';
+    if (state.view === 'series') return count === 1 ? ' series' : ' series';
+    return count === 1 ? ' stream' : ' streams';
   }
 
   function setStatus(message, tone) {

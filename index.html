@@ -27,7 +27,7 @@
     </header>
 
     <main class="shell">
-      <section class="player-section" aria-label="Player">
+      <section id="playerSection" class="player-section hidden" aria-label="Player">
         <video id="video" controls playsinline preload="metadata"></video>
         <div class="now-row">
           <div>
@@ -65,7 +65,10 @@
 
           <section class="results-pane">
             <div class="results-head">
-              <h2 id="resultsTitle">Live</h2>
+              <div class="results-title-row">
+                <button id="backBtn" class="back-btn hidden" type="button">Back</button>
+                <h2 id="resultsTitle">Live</h2>
+              </div>
               <span id="resultsCount">0 streams</span>
             </div>
             <div id="results" class="results"></div>
