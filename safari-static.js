@@ -306,7 +306,8 @@
   function metaForItem(item) {
     if (item.type === 'episode') {
       var label = 'S' + pad2(item.season) + ' E' + pad2(item.episode);
-      return item.duration ? label + ' · ' + item.duration : label;
+      var player = item.player === 'vlc' ? 'VLC' : 'Safari';
+      return (item.duration ? label + ' · ' + item.duration : label) + ' · ' + player;
     }
     if (item.type === 'series') {
       var count = (item.episodes || []).length;
@@ -349,12 +350,23 @@
     state.current = item;
     els.nowTitle.textContent = item.name;
     els.nowMeta.textContent = item.category;
-    els.openBtn.href = item.url;
-    els.openBtn.textContent = 'Open in New Tab';
+    els.openBtn.href = item.player === 'vlc' ? vlcStreamUrl(item.url) : item.url;
+    els.openBtn.textContent = item.player === 'vlc' ? 'Open in VLC' : 'Open in New Tab';
     els.openBtn.classList.remove('disabled');
     els.copyBtn.disabled = false;
     els.favoriteBtn.disabled = false;
     updateFavoriteButton();
+
+    if (item.player === 'vlc') {
+      els.video.removeAttribute('src');
+      els.video.load();
+      if (openExternal) {
+        openVlcWindow(item.url);
+      } else {
+        setStatus('This episode needs VLC on iPhone. Tap Open in VLC.', 'bad');
+      }
+      return;
+    }
 
     if (isMixedStream(item.url)) {
       els.video.removeAttribute('src');
@@ -389,6 +401,19 @@
       setStatus('Opening stream in a new Safari tab...', 'good');
     } else {
       setStatus('Safari blocked the new tab. Tap Open in New Tab.', 'bad');
+    }
+  }
+
+  function vlcStreamUrl(url) {
+    return 'vlc-x-callback://x-callback-url/stream?url=' + encodeURIComponent(url);
+  }
+
+  function openVlcWindow(url) {
+    var popup = window.open(vlcStreamUrl(url), '_blank', 'noopener,noreferrer');
+    if (popup) {
+      setStatus('Opening episode in VLC...', 'good');
+    } else {
+      setStatus('Safari blocked VLC. Tap Open in VLC.', 'bad');
     }
   }
 
