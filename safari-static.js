@@ -132,6 +132,8 @@
     var linkKey = readLinkKey();
     var savedPassword = linkKey ? loadSavedPassword(linkKey) : '';
     if (!savedPassword) return;
+    els.unlockForm.classList.add('hidden');
+    els.summary.textContent = 'Unlocking saved device...';
     els.unlockError.textContent = 'Unlocking saved device...';
     unlockCatalog(savedPassword, true);
   }
@@ -169,6 +171,8 @@
       })
       .catch(function () {
         if (automatic) forgetPassword(linkKey);
+        els.unlockForm.classList.remove('hidden');
+        els.summary.textContent = 'Catalog locked.';
         els.unlockError.textContent = automatic ? 'Saved unlock expired. Enter the password again.' : 'Incorrect password, missing link key, or damaged catalog.';
       });
   }
@@ -195,12 +199,16 @@
   }
 
   function savedPasswordKey(linkKey) {
+    return 'safariStreamPassword:v2:' + window.location.host + ':' + linkKey.slice(0, 18);
+  }
+
+  function legacySavedPasswordKey(linkKey) {
     return 'safariStreamPassword:' + window.location.pathname + ':' + linkKey.slice(0, 12);
   }
 
   function loadSavedPassword(linkKey) {
     try {
-      return localStorage.getItem(savedPasswordKey(linkKey)) || '';
+      return localStorage.getItem(savedPasswordKey(linkKey)) || localStorage.getItem(legacySavedPasswordKey(linkKey)) || '';
     } catch {
       return '';
     }
@@ -217,6 +225,7 @@
   function forgetPassword(linkKey) {
     try {
       localStorage.removeItem(savedPasswordKey(linkKey));
+      localStorage.removeItem(legacySavedPasswordKey(linkKey));
     } catch {
       return;
     }
