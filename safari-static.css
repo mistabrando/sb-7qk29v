@@ -59,6 +59,19 @@ body {
   font-size: 13px;
 }
 
+.remember-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.remember-row input {
+  width: auto;
+  accent-color: var(--accent);
+}
+
 .unlock-card button {
   border-color: var(--accent);
   background: var(--accent);

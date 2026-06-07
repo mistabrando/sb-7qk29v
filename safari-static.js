@@ -17,6 +17,7 @@
     lockScreen: document.getElementById('lockScreen'),
     unlockForm: document.getElementById('unlockForm'),
     catalogPassword: document.getElementById('catalogPassword'),
+    rememberUnlock: document.getElementById('rememberUnlock'),
     unlockError: document.getElementById('unlockError'),
     summary: document.getElementById('summary'),
     playerSection: document.getElementById('playerSection'),
@@ -49,6 +50,7 @@
     els.summary.textContent = 'Catalog locked.';
     bindEvents();
     renderAll();
+    autoUnlockCatalog();
   }
 
   function bindEvents() {
@@ -115,7 +117,7 @@
     els.video.addEventListener('error', function () {
       var code = els.video.error ? els.video.error.code : 'unknown';
       if (state.current && isMixedStream(state.current.url)) {
-      setStatus('Mobile Safari may block this HTTP live stream inside the HTTPS page. Tap Open in New Tab.', 'bad');
+        setStatus('Mobile Safari may block this HTTP live stream inside the HTTPS page. Tap Open in New Tab.', 'bad');
         return;
       }
       setStatus('Playback error. Safari reported media error code ' + code + '.', 'bad');
@@ -126,8 +128,16 @@
     });
   }
 
-  function unlockCatalog() {
-    var password = els.catalogPassword.value;
+  function autoUnlockCatalog() {
+    var linkKey = readLinkKey();
+    var savedPassword = linkKey ? loadSavedPassword(linkKey) : '';
+    if (!savedPassword) return;
+    els.unlockError.textContent = 'Unlocking saved device...';
+    unlockCatalog(savedPassword, true);
+  }
+
+  function unlockCatalog(savedPassword, automatic) {
+    var password = savedPassword || els.catalogPassword.value;
     if (!password) return;
     var linkKey = readLinkKey();
     if (!linkKey) {
@@ -153,10 +163,13 @@
         els.lockScreen.classList.add('hidden');
         els.catalogPassword.value = '';
         els.unlockError.textContent = '';
+        if (els.rememberUnlock.checked || automatic) savePassword(linkKey, password);
+        else forgetPassword(linkKey);
         renderAll();
       })
       .catch(function () {
-        els.unlockError.textContent = 'Incorrect password, missing link key, or damaged catalog.';
+        if (automatic) forgetPassword(linkKey);
+        els.unlockError.textContent = automatic ? 'Saved unlock expired. Enter the password again.' : 'Incorrect password, missing link key, or damaged catalog.';
       });
   }
 
@@ -179,6 +192,34 @@
       .then(function (payload) {
         return decryptJson(payload, password);
       });
+  }
+
+  function savedPasswordKey(linkKey) {
+    return 'safariStreamPassword:' + window.location.pathname + ':' + linkKey.slice(0, 12);
+  }
+
+  function loadSavedPassword(linkKey) {
+    try {
+      return localStorage.getItem(savedPasswordKey(linkKey)) || '';
+    } catch {
+      return '';
+    }
+  }
+
+  function savePassword(linkKey, password) {
+    try {
+      localStorage.setItem(savedPasswordKey(linkKey), password);
+    } catch {
+      setStatus('Unlocked, but Safari did not allow local password storage.', 'bad');
+    }
+  }
+
+  function forgetPassword(linkKey) {
+    try {
+      localStorage.removeItem(savedPasswordKey(linkKey));
+    } catch {
+      return;
+    }
   }
 
   function decryptJson(payload, password) {
