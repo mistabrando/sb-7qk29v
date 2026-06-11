@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="0">
+    <meta name="referrer" content="no-referrer">
+    <title>Opening Stream Browser</title>
+    <style>
+      html,
+      body {
+        min-height: 100%;
+        margin: 0;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+        background: #101318;
+        color: #f4f7fb;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(88vw, 360px);
+        text-align: center;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: 22px;
+        font-weight: 750;
+      }
+
+      p {
+        margin: 0;
+        color: #b7c0cc;
+        line-height: 1.45;
+      }
+
+      a {
+        color: #9ed0ff;
+      }
+    </style>
+    <script>
+      (function () {
+        'use strict';
+
+        var build = 'unlock-hotfix-2fbf21c';
+        var target = 'index.html?v=' + encodeURIComponent(build) + window.location.hash;
+        window.location.replace(target);
+        document.addEventListener('DOMContentLoaded', function () {
+          var fallback = document.getElementById('fallbackLink');
+          if (fallback) fallback.href = target;
+        });
+      })();
+    </script>
+  </head>
+  <body>
+    <main>
+      <h1>Opening Stream Browser</h1>
+      <p>If it does not open, <a id="fallbackLink" href="index.html?v=unlock-hotfix-2fbf21c">tap here</a>.</p>
+    </main>
+  </body>
+</html>
