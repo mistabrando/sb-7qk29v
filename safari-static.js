@@ -151,8 +151,9 @@
       els.unlockError.textContent = 'Safari requires HTTPS or a local file for password unlock.';
       return;
     }
+    var rememberDevice = els.rememberUnlock.checked || automatic;
     els.unlockError.textContent = automatic ? 'Loading saved catalog...' : 'Unlocking...';
-    loadEncryptedCatalog(password + '\n' + linkKey, linkKey, els.rememberUnlock.checked || automatic)
+    loadEncryptedCatalog(password + '\n' + linkKey, linkKey, rememberDevice)
       .then(function (unlocked) {
         catalog = unlocked;
         liveByCategory = countByCategory(catalog.live);
@@ -166,9 +167,10 @@
         els.lockScreen.classList.add('hidden');
         els.catalogPassword.value = '';
         els.unlockError.textContent = '';
-        if (els.rememberUnlock.checked || automatic) savePassword(linkKey, password);
+        if (rememberDevice) savePassword(linkKey, password);
         else forgetPassword(linkKey);
         renderAll();
+        if (rememberDevice) savePlainCatalogCache(linkKey, catalog);
       })
       .catch(function () {
         if (automatic) forgetPassword(linkKey);
@@ -187,46 +189,31 @@
 
   function loadEncryptedCatalog(password, linkKey, allowPlainCache) {
     if (allowPlainCache) {
-      return loadPlainCatalogCache(linkKey).then(function (cached) {
-        if (cached) return cached;
-        return decryptAndCacheCatalog(password, linkKey, allowPlainCache);
-      });
+      return withTimeout(loadPlainCatalogCache(linkKey), 900, null)
+        .catch(function () {
+          return null;
+        })
+        .then(function (cached) {
+          if (cached) return cached;
+          return decryptAndCacheCatalog(password);
+        });
     }
-    return decryptAndCacheCatalog(password, linkKey, allowPlainCache);
+    return decryptAndCacheCatalog(password);
   }
 
-  function decryptAndCacheCatalog(password, linkKey, allowPlainCache) {
+  function decryptAndCacheCatalog(password) {
     if (window.ENCRYPTED_STREAM_CATALOG) {
-      return decryptJson(window.ENCRYPTED_STREAM_CATALOG, password).then(function (unlocked) {
-        if (allowPlainCache) savePlainCatalogCache(linkKey, unlocked);
-        return unlocked;
-      });
+      return decryptJson(window.ENCRYPTED_STREAM_CATALOG, password);
     }
     return loadEncryptedPayload()
       .then(function (payload) {
         return decryptJson(payload, password);
-      })
-      .then(function (unlocked) {
-        if (allowPlainCache) savePlainCatalogCache(linkKey, unlocked);
-        return unlocked;
       });
   }
 
   function loadEncryptedPayload() {
     var catalogUrl = 'encrypted-catalog.json?v=' + appCacheVersion;
-    if (!window.caches) {
-      return fetch(catalogUrl, { cache: 'force-cache' }).then(readCatalogResponse);
-    }
-    return caches.open('safari-stream-browser:' + appCacheVersion).then(function (cache) {
-      return cache.match(catalogUrl).then(function (cached) {
-        if (cached) return cached.json();
-        return fetch(catalogUrl, { cache: 'force-cache' }).then(function (response) {
-          if (!response.ok) throw new Error('Catalog not found');
-          cache.put(catalogUrl, response.clone()).catch(function () {});
-          return response.json();
-        });
-      });
-    });
+    return fetch(catalogUrl, { cache: 'force-cache' }).then(readCatalogResponse);
   }
 
   function readCatalogResponse(response) {
@@ -281,7 +268,9 @@
 
   function savePlainCatalogCache(linkKey, unlocked) {
     if (!isValidCatalog(unlocked)) return;
-    idbSet(plainCatalogCacheKey(linkKey), unlocked).catch(function () {});
+    setTimeout(function () {
+      withTimeout(idbSet(plainCatalogCacheKey(linkKey), unlocked), 7000, false).catch(function () {});
+    }, 1200);
   }
 
   function forgetPlainCatalogCache(linkKey) {
@@ -294,11 +283,24 @@
         resolve(null);
         return;
       }
-      var request = indexedDB.open('safariStreamBrowser', 1);
+      var request;
+      try {
+        request = indexedDB.open('safariStreamBrowserV2', 1);
+      } catch {
+        resolve(null);
+        return;
+      }
       request.onupgradeneeded = function () {
-        request.result.createObjectStore('catalogs');
+        if (!request.result.objectStoreNames.contains('catalogs')) {
+          request.result.createObjectStore('catalogs');
+        }
       };
       request.onsuccess = function () {
+        if (!request.result.objectStoreNames.contains('catalogs')) {
+          request.result.close();
+          resolve(null);
+          return;
+        }
         resolve(request.result);
       };
       request.onerror = function () {
@@ -314,8 +316,16 @@
     return openCatalogDb().then(function (db) {
       if (!db) return null;
       return new Promise(function (resolve) {
-        var transaction = db.transaction('catalogs', 'readonly');
-        var request = transaction.objectStore('catalogs').get(key);
+        var transaction;
+        var request;
+        try {
+          transaction = db.transaction('catalogs', 'readonly');
+          request = transaction.objectStore('catalogs').get(key);
+        } catch {
+          db.close();
+          resolve(null);
+          return;
+        }
         request.onsuccess = function () {
           resolve(request.result || null);
         };
@@ -337,8 +347,15 @@
     return openCatalogDb().then(function (db) {
       if (!db) return null;
       return new Promise(function (resolve) {
-        var transaction = db.transaction('catalogs', 'readwrite');
-        transaction.objectStore('catalogs').put(value, key);
+        var transaction;
+        try {
+          transaction = db.transaction('catalogs', 'readwrite');
+          transaction.objectStore('catalogs').put(value, key);
+        } catch {
+          db.close();
+          resolve(false);
+          return;
+        }
         transaction.oncomplete = function () {
           db.close();
           resolve(true);
@@ -355,8 +372,15 @@
     return openCatalogDb().then(function (db) {
       if (!db) return null;
       return new Promise(function (resolve) {
-        var transaction = db.transaction('catalogs', 'readwrite');
-        transaction.objectStore('catalogs').delete(key);
+        var transaction;
+        try {
+          transaction = db.transaction('catalogs', 'readwrite');
+          transaction.objectStore('catalogs').delete(key);
+        } catch {
+          db.close();
+          resolve(false);
+          return;
+        }
         transaction.oncomplete = function () {
           db.close();
           resolve(true);
@@ -379,6 +403,31 @@
       Array.isArray(value.vodCategories) &&
       Array.isArray(value.seriesCategories)
     );
+  }
+
+  function withTimeout(promise, timeoutMs, fallback) {
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      var timer = setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        resolve(fallback);
+      }, timeoutMs);
+      promise.then(
+        function (value) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(value);
+        },
+        function (error) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          reject(error);
+        },
+      );
+    });
   }
 
   function decryptJson(payload, password) {
