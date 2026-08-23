@@ -707,7 +707,35 @@
 
   function openExternalPlayer(url, filename) {
     setStatus('Opening in ' + externalPlayerLabel() + '...', 'good');
+    if (state.externalPlayer === 'vlc' && !isIOS()) {
+      downloadVlcPlaylist(url, filename);
+      return;
+    }
     window.location.href = externalPlayerUrl(url, filename);
+  }
+
+  function downloadVlcPlaylist(url, filename) {
+    var title = cleanFilename(filename || 'stream');
+    var contents = '#EXTM3U\n#EXTINF:-1,' + title + '\n' + url + '\n';
+    var blob = new Blob([contents], { type: 'application/vnd.apple.mpegurl' });
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = title + '.m3u';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () {
+      URL.revokeObjectURL(link.href);
+    }, 1000);
+    setStatus('Downloaded a VLC playlist. Open the .m3u file with VLC.', 'good');
+  }
+
+  function isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  function cleanFilename(value) {
+    return String(value || 'stream').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90) || 'stream';
   }
 
   function updateExternalPlayerButtons() {
