@@ -272,6 +272,14 @@ video {
   background: var(--panel-2);
 }
 
+.player-toggle {
+  flex: 0 0 auto;
+}
+
+.player-toggle button {
+  min-width: 68px;
+}
+
 .browser-grid {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
@@ -588,11 +596,21 @@ video {
     width: 100%;
   }
 
+  .player-toggle {
+    width: auto;
+    align-self: flex-start;
+  }
+
   .segmented button {
     flex: 1;
     min-height: 38px;
     padding: 8px 6px;
     font-size: 13px;
+  }
+
+  .player-toggle button {
+    flex: 0 0 auto;
+    min-width: 82px;
   }
 
   .browser-grid {

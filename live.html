@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Safari Stream Browser</title>
     <link rel="stylesheet" href="safari-static.css">
-    <script defer src="safari-static-unlock-hotfix.js"></script>
+    <script defer src="safari-static-unlock-hotfix.js?v=vlc-20260823"></script>
   </head>
   <body>
     <div id="lockScreen" class="lock-screen">
@@ -58,6 +58,10 @@
             <button type="button" data-view="favorites">Favorites</button>
             <button type="button" data-view="vod">VOD</button>
             <button type="button" data-view="series">Series</button>
+          </div>
+          <div id="externalPlayer" class="segmented player-toggle" role="group" aria-label="External player">
+            <button class="active" type="button" data-player="infuse">Infuse</button>
+            <button type="button" data-player="vlc">VLC</button>
           </div>
         </div>
 

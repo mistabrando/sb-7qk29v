@@ -10,6 +10,7 @@
     current: null,
     activeSeries: null,
     favorites: loadFavorites(),
+    externalPlayer: loadExternalPlayer(),
     renderToken: 0,
   };
 
@@ -35,6 +36,7 @@
     favoriteBtn: document.getElementById('favoriteBtn'),
     copyBtn: document.getElementById('copyBtn'),
     openBtn: document.getElementById('openBtn'),
+    externalPlayer: document.getElementById('externalPlayer'),
     installHint: document.getElementById('installHint'),
   };
 
@@ -70,6 +72,20 @@
         state.activeSeries = null;
         if (state.view !== 'live') hidePlayer();
         renderAll();
+      });
+    });
+
+    updateExternalPlayerButtons();
+    document.querySelectorAll('[data-player]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        state.externalPlayer = button.dataset.player === 'vlc' ? 'vlc' : 'infuse';
+        saveExternalPlayer();
+        updateExternalPlayerButtons();
+        if (state.activeSeries) {
+          renderEpisodes(state.activeSeries);
+        } else {
+          renderResults();
+        }
       });
     });
 
@@ -565,7 +581,7 @@
         return;
       }
       if (item.type === 'vod' || item.type === 'episode') {
-        openInfuseWindow(item.url, item.name);
+        openExternalPlayer(item.url, item.name);
         return;
       }
       play(item, true);
@@ -576,13 +592,13 @@
   function metaForItem(item) {
     if (item.type === 'episode') {
       var label = 'S' + pad2(item.season) + ' E' + pad2(item.episode);
-      return (item.duration ? label + ' · ' + item.duration : label) + ' · Infuse';
+      return (item.duration ? label + ' · ' + item.duration : label) + ' · ' + externalPlayerLabel();
     }
     if (item.type === 'series') {
       var count = (item.episodes || []).length;
       return item.category + (count ? ' · ' + count + ' episodes indexed' : ' · episodes pending');
     }
-    if (item.type === 'vod') return [item.year || '', item.rating ? 'Rating ' + item.rating : '', 'Infuse'].filter(Boolean).join(' · ');
+    if (item.type === 'vod') return [item.year || '', item.rating ? 'Rating ' + item.rating : '', externalPlayerLabel()].filter(Boolean).join(' · ');
     return item.category;
   }
 
@@ -601,7 +617,7 @@
       return;
     }
     appendCards(series.episodes);
-    setStatus('Choose an episode to open in Infuse.', 'good');
+    setStatus('Choose an episode to open in ' + externalPlayerLabel() + '.', 'good');
   }
 
   function thumbFallback(item) {
@@ -618,7 +634,7 @@
   function play(item, openExternal) {
     state.current = item;
     if (item.type !== 'live') {
-      openInfuseWindow(item.url, item.name);
+      openExternalPlayer(item.url, item.name);
       return;
     }
     showPlayer();
@@ -676,9 +692,28 @@
     );
   }
 
-  function openInfuseWindow(url, filename) {
-    setStatus('Opening in Infuse...', 'good');
-    window.location.href = infuseStreamUrl(url, filename);
+  function vlcStreamUrl(url) {
+    return 'vlc-x-callback://x-callback-url/stream?url=' + encodeURIComponent(url);
+  }
+
+  function externalPlayerUrl(url, filename) {
+    if (state.externalPlayer === 'vlc') return vlcStreamUrl(url);
+    return infuseStreamUrl(url, filename);
+  }
+
+  function externalPlayerLabel() {
+    return state.externalPlayer === 'vlc' ? 'VLC' : 'Infuse';
+  }
+
+  function openExternalPlayer(url, filename) {
+    setStatus('Opening in ' + externalPlayerLabel() + '...', 'good');
+    window.location.href = externalPlayerUrl(url, filename);
+  }
+
+  function updateExternalPlayerButtons() {
+    document.querySelectorAll('[data-player]').forEach(function (button) {
+      button.classList.toggle('active', button.dataset.player === state.externalPlayer);
+    });
   }
 
   function showPlayer() {
@@ -796,6 +831,14 @@
 
   function saveFavorites() {
     localStorage.setItem('safariStreamFavorites', JSON.stringify(state.favorites));
+  }
+
+  function loadExternalPlayer() {
+    return localStorage.getItem('safariStreamExternalPlayer') === 'vlc' ? 'vlc' : 'infuse';
+  }
+
+  function saveExternalPlayer() {
+    localStorage.setItem('safariStreamExternalPlayer', state.externalPlayer);
   }
 
   function escapeHtml(value) {
