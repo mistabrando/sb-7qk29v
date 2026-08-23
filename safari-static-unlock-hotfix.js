@@ -43,7 +43,7 @@
   var seriesByCategory = {};
   var searchTimer = null;
   var maxRenderedCards = 420;
-  var appCacheVersion = 'catalog-cache-2026-06-09a';
+  var appCacheVersion = 'catalog-cache-2026-08-22a';
 
   init();
 
